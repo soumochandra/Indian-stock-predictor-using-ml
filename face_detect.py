@@ -7,7 +7,7 @@ from sklearn.preprocessing import OrdinalEncoder, StandardScaler
 from sklearn.metrics import accuracy_score
 
 # === Load and Prepare Data ===
-dataset = pd.read_csv("C:\\Users\\soumo\\OneDrive\\Documents\\PYTHON\\ML-40\\Datasets\\National_Stock_Exchange_of_India_Ltd.csv")
+dataset = pd.read_csv("Here paste the path of the dataset")
 dataset = dataset.drop(["LTP", "Chng", "% Chng", "52w H", "52w L", "365 d % chng", "30 d % chng"], axis=1)
 
 encoder = OrdinalEncoder()
