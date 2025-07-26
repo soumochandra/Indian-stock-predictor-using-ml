@@ -1,119 +1,98 @@
-import cv2
-import os
-import threading
-import datetime
-import pyttsx3
+import pandas as pd
+import numpy as np
 from tkinter import *
-from tkinter import filedialog
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+from sklearn.metrics import accuracy_score
 
-# Load Haar classifiers
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
-smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_smile.xml")
+# === Load and Prepare Data ===
+dataset = pd.read_csv("C:\\Users\\soumo\\OneDrive\\Documents\\PYTHON\\ML-40\\Datasets\\National_Stock_Exchange_of_India_Ltd.csv")
+dataset = dataset.drop(["LTP", "Chng", "% Chng", "52w H", "52w L", "365 d % chng", "30 d % chng"], axis=1)
 
-# Text-to-speech setup
-engine = pyttsx3.init()
-engine.setProperty('rate', 150)
+encoder = OrdinalEncoder()
+dataset['Symbol'] = encoder.fit_transform(dataset[['Symbol']])
 
-# Globals
-cap = None
-running = False
-latest_faces = []
-save_folder = ""
+features = dataset.drop("Symbol", axis=1)
+labels = dataset["Symbol"]
 
-# Function to save detected faces
-def save_faces(frame, faces):
-    global save_folder
-    if not save_folder:
-        save_folder = filedialog.askdirectory(title="Choose folder to save faces")
-        if not save_folder:
-            return
-    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    for i, (x, y, w, h) in enumerate(faces):
-        roi = frame[y:y+h, x:x+w]
-        filename = os.path.join(save_folder, f"face_{now}_{i}.jpg")
-        cv2.imwrite(filename, roi)
-        print(f"[✔] Saved: {filename}")
+scaler = StandardScaler()
+features_scaled = scaler.fit_transform(features)
 
-# Face detection thread
-def detect_faces():
-    global cap, running, latest_faces
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # Faster on Windows
+x_train, x_test, y_train, y_test = train_test_split(features_scaled, labels, test_size=0.4, random_state=5)
 
-    if not cap.isOpened():
-        print("Camera not available")
-        return
+model = LogisticRegression(max_iter=2000)
+model.fit(x_train, y_train)
 
-    while running:
-        ret, frame = cap.read()
-        if not ret:
-            break
+model_predict = model.predict(x_test)
+accuracy = accuracy_score(y_test, model_predict)
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.1, 5)
-        latest_faces = faces
-        face_label.config(text=f"Faces Detected: {len(faces)}")
-
-        if len(faces) > 0:
-            engine.say(f"{len(faces)} face{'s' if len(faces) != 1 else ''} detected")
-            engine.runAndWait()
-
-        for (x, y, w, h) in faces:
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-            roi_gray = gray[y:y+h, x:x+w]
-            roi_color = frame[y:y+h, x:x+w]
-
-            eyes = eye_cascade.detectMultiScale(roi_gray, 1.1, 3)
-            for (ex, ey, ew, eh) in eyes:
-                cv2.rectangle(roi_color, (ex, ey), (ex+ew, ey+eh), (255, 0, 0), 1)
-
-            smiles = smile_cascade.detectMultiScale(roi_gray, 1.8, 20)
-            for (sx, sy, sw, sh) in smiles:
-                cv2.rectangle(roi_color, (sx, sy), (sx+sw, sy+sh), (0, 0, 255), 1)
-
-        cv2.imshow("Face Detection by soumo chandra", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-# Button actions
-def start_detection():
-    global running
-    if not running:
-        running = True
-        threading.Thread(target=detect_faces).start()
-
-def stop_detection():
-    global running
-    running = False
-
-def save_detected_faces():
-    if cap is not None and len(latest_faces) > 0:
-        ret, frame = cap.read()
-        if ret:
-            save_faces(frame, latest_faces)
-
-def close_app():
-    stop_detection()
-    root.destroy()
-
-# GUI setup
+# === GUI Setup ===
 root = Tk()
-root.title("Face Detection by soumo chandra")
-root.geometry("360x300")
-root.configure(bg="#f0f0f0")
+root.title("Stock Company Predictor")
+root.geometry("520x500")
+root.configure(bg="#1e1e2f")
 
-Label(root, text="Face Detection App by soumo chandra", font=("Arial", 18, "bold"), bg="#f0f0f0", fg="#333").pack(pady=15)
-face_label = Label(root, text="Faces Detected: 0", font=("Arial", 12), bg="#f0f0f0", fg="#444")
-face_label.pack(pady=5)
+style_font = ("Segoe UI", 12)
+label_font = ("Segoe UI", 11)
+title_font = ("Segoe UI", 16, "bold")
+entry_bg = "#2d2d44"
+entry_fg = "white"
 
-btn_style = {"font": ("Arial", 12), "bg": "#007acc", "fg": "white", "activebackground": "#005f99", "width": 20}
+Label(root, text="Stock Company Predictor", font=title_font, bg="#1e1e2f", fg="white").pack(pady=15)
 
-Button(root, text="Start Detection", command=start_detection, **btn_style).pack(pady=5)
-Button(root, text="Stop Detection", command=stop_detection, **btn_style).pack(pady=5)
-Button(root, text="Save Faces", command=save_detected_faces, **btn_style).pack(pady=5)
-Button(root, text="Exit", command=close_app, **btn_style).pack(pady=10)
+form_frame = Frame(root, bg="#1e1e2f")
+form_frame.pack(pady=5)
+
+def create_input_row(label_text):
+    row = Frame(form_frame, bg="#1e1e2f")
+    Label(row, text=label_text, font=label_font, width=14, anchor='w', bg="#1e1e2f", fg="white").pack(side=LEFT)
+    entry = Entry(row, font=style_font, bg=entry_bg, fg=entry_fg, insertbackground="white", relief=FLAT, width=25)
+    entry.pack(side=RIGHT, expand=True, fill=X, padx=10)
+    row.pack(fill=X, pady=6, padx=20)
+    return entry
+
+open_entry = create_input_row("Open")
+high_entry = create_input_row("High")
+low_entry = create_input_row("Low")
+qty_entry = create_input_row("Qty")
+turnover_entry = create_input_row("Turnover")
+
+result_label = Label(root, text="", font=label_font, bg="#1e1e2f", fg="lightgreen")
+result_label.pack(pady=15)
+
+accuracy_label = Label(root, text=f"Model Accuracy: {accuracy*100:.2f}%", font=label_font, bg="#1e1e2f", fg="#ffb703")
+accuracy_label.pack()
+
+# === Predict Company ===
+def predict_company():
+    try:
+        open_val = float(open_entry.get())
+        high_val = float(high_entry.get())
+        low_val = float(low_entry.get())
+        qty_val = float(qty_entry.get())
+        turnover_val = float(turnover_entry.get())
+
+        input_data = np.array([[open_val, high_val, low_val, qty_val, turnover_val]])
+        input_scaled = scaler.transform(input_data)
+
+        prediction = model.predict(input_scaled)
+        company = encoder.inverse_transform([prediction])[0][0]
+
+        result_label.config(text=f"Predicted Company: {company}", fg="lightgreen")
+    except Exception as e:
+        result_label.config(text=f"Error: {e}", fg="red")
+
+# === Predict Button ===
+def on_enter(e): e.widget['background'] = "#00b894"
+def on_leave(e): e.widget['background'] = "#0984e3"
+
+predict_btn = Button(root, text="Predict Company", command=predict_company,
+                     font=style_font, bg="#0984e3", fg="white", padx=10, pady=8, relief=FLAT, cursor="hand2")
+predict_btn.pack(pady=20)
+predict_btn.bind("<Enter>", on_enter)
+predict_btn.bind("<Leave>", on_leave)
+
+Label(root, text="Designed by Soumo", font=("Segoe UI", 10), bg="#1e1e2f", fg="gray").pack(side=BOTTOM, pady=10)
 
 root.mainloop()
